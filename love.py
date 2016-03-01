@@ -22,7 +22,7 @@ class behave:
         self.image_sub = rospy.Subscriber("/turtlebot_1/camera/rgb/image_raw", Image, self.callback)
                                           
     def lasercallback(self, data):
-        self.laser = data                                          
+        self.laser = data                                    
                                           
     def callback(self, data):
         try:
@@ -30,19 +30,24 @@ class behave:
             height, width, channels = cv_image.shape
             hsv_img = cv2.cvtColor(cv_image, cv2.COLOR_BGR2HSV)
             mean = numpy.mean(hsv_img[:, :, 2])
-            print mean
             
             left = cv_image[0:height,0:width/2]
             right = cv_image[0:height,width/2:width]
             height, width, channels = left.shape
+            
         except CvBridgeError, e:
             print e
             
         l_wheel = 0
         r_wheel = 0
         hit = False
+        
+        ranges = self.laser.ranges
+        sortDist = sorted(ranges)
+        middle = int(round((len(ranges)-1)/2))
+        short = sortDist[middle]
     
-        if self.laser.range_max > 0.2:
+        if short < 1.0: # This needs to be fixed
                 twist_msg = Twist()
                 twist_msg.linear.x = 0.0
                 twist_msg.linear.y = 0.0
@@ -56,8 +61,8 @@ class behave:
         else:
             leftRange = numpy.zeros((height,width,1), numpy.uint8)
             rightRange = numpy.zeros((height,width,1), numpy.uint8)
-            cv2.inRange(left, numpy.array([0, 100, 0]), numpy.array([0, 255, 0]), leftRange)
-            cv2.inRange(right, numpy.array([0, 100, 0]), numpy.array([0, 255, 0]), rightRange)      
+            cv2.inRange(left, numpy.array([0, 1, 0]), numpy.array([0, 255, 0]), leftRange)
+            cv2.inRange(right, numpy.array([0, 1, 0]), numpy.array([0, 255, 0]), rightRange)      
 
             if cv2.countNonZero(leftRange) > 0:
                 print "left"
@@ -71,9 +76,9 @@ class behave:
                 print "right"
                 if mean > self.threshold:
                     r_wheel = 1.0 # Love
-            else:
-                l_wheel = 1.0 # Fear
-            hit = True
+                else:
+                    l_wheel = 1.0 # Fear
+                hit = True
             
         if hit:
             print "hit"
