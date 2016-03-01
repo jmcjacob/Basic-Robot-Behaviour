@@ -45,7 +45,8 @@ class behave:
         ranges = self.laser.ranges
         sortDist = sorted(ranges)
         middle = int(round((len(ranges)-1)/2))
-        short = sortDist[middle]
+        short = sortDist[0]
+        center = ranges[middle]
     
         if short < 1.0: # This needs to be fixed
                 twist_msg = Twist()
@@ -54,7 +55,7 @@ class behave:
                 twist_msg.linear.z = 0.0
                 twist_msg.angular.x = 0.0
                 twist_msg.angular.y = 0.0
-                twist_msg.angular.z = 0.0
+                twist_msg.angular.z = 0.2
                 self.pub.publish(twist_msg)
                 print "too close" 
                 
@@ -67,25 +68,34 @@ class behave:
             if cv2.countNonZero(leftRange) > 0:
                 print "left"
                 if mean > self.threshold:
-                    l_wheel = 1.0 # Love
+                    l_wheel = 0.7 # Love
                 else:
-                    r_wheel = 1.0 # Fear
+                    r_wheel = 0.7 # Fear
                 hit = True
             
             if cv2.countNonZero(rightRange) > 0:
                 print "right"
                 if mean > self.threshold:
-                    r_wheel = 1.0 # Love
+                    r_wheel = 0.7 # Love
                 else:
-                    l_wheel = 1.0 # Fear
+                    l_wheel = 0.7 # Fear
                 hit = True
             
         if hit:
             print "hit"
-            (v, a) = forward_kinematics(l_wheel, r_wheel)
             twist_msg = Twist()
-            twist_msg.linear.x = v
-            twist_msg.angular.z = a
+            if r_wheel == l_wheel:
+                print center
+                value = 1.0 - (1.0/center)
+                if value <= 0:
+                    value = 0
+                (v, a) = forward_kinematics(value, value)
+                twist_msg.linear.x = v
+                twist_msg.angular.z = a
+            else:
+                (v, a) = forward_kinematics(l_wheel, r_wheel)
+                twist_msg.linear.x = v
+                twist_msg.angular.z = a
             self.pub.publish(twist_msg)
             
         else:
