@@ -2,6 +2,8 @@ import rospy
 import cv2
 import numpy
 from sensor_msgs.msg import Image
+from sensor_msgs.msg import LaserScan
+from geometry_msgs.msg import Twist
 from cv_bridge import CvBridge, CvBridgeError
 
 wheel_radius = 1
@@ -10,55 +12,86 @@ robot_radius = 1
 class behave:
 
     def __init__(self):
-
-        cv2.namedWindow("Image window", 1)
+        cv2.namedWindow("Left window", 1)
+        cv2.namedWindow("Right window", 1)
         cv2.startWindowThread()
+        self.threshold = 40
         self.bridge = CvBridge()
+        self.pub = rospy.Publisher('/turtlebot_1/cmd_vel', Twist, queue_size=10)
+        self.laser_sub = rospy.Subscriber("/turtlebot_1/scan", LaserScan, self.lasercallback)
         self.image_sub = rospy.Subscriber("/turtlebot_1/camera/rgb/image_raw", Image, self.callback)
-        
-        # Make Publisher
+                                          
+    def lasercallback(self, data):
+        self.laser = data                                          
                                           
     def callback(self, data):
         try:
             cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
             height, width, channels = cv_image.shape
             hsv_img = cv2.cvtColor(cv_image, cv2.COLOR_BGR2HSV)
-            left = hsv_img[0:height,0:width/2]
-            right = hsv_img[0:height,width/2:width]
+            mean = numpy.mean(hsv_img[:, :, 2])
+            print mean
+            
+            left = cv_image[0:height,0:width/2]
+            right = cv_image[0:height,width/2:width]
             height, width, channels = left.shape
         except CvBridgeError, e:
             print e
-        
-        leftRange = numpy.zeros((height,width,3), numpy.uint8)
-        rightRange = numpy.zeros((height,width,3), numpy.uint8)
-        cv2.inRange(left, numpy.array((60, 200, 0)), numpy.array((170, 255, 255)), leftRange)
-        cv2.inRange(left, numpy.array((60, 200, 0)), numpy.array((170, 255, 255)), rightRange)
-        
-        #Convert left and right Range to 8 bit        
-        
-        leftcircles = cv2.HoughCircles(leftRange, cv2.cv.CV_HOUGH_GRADIENT, 4, 20, param1=230, param2=230, minRadius=0, maxRadius=0)
-        rightcircles = cv2.HoughCircles(rightRange, cv2.cv.CV_HOUGH_GRADIENT, 4, 20, param1=230, param2=230, minRadius=0, maxRadius=0)
-        
-        if leftcircles is not None:
-            leftcircles = numpy.round(leftcircles[0,:]).astype("int")
-            highest = 0
-            for (x,y,r) in leftcircles:
-                if left(x,y,3) > highest:
-                    highest = left(x,y,3)
-            l_wheel = 2.55 - (highest/100)
             
-        if rightcircles is not None:
-            rightcircles = numpy.round(rightcircles[0,:]).astype("int")
-            highest = 0
-            for (x,y,r) in rightcircles:
-                if right(x,y,3) > highest:
-                    highest = right(x,y,3)
-            r_wheel = 2.55 - (highest/100)
-        
-        (v, a) = forward_kinematics(l_wheel, r_wheel)
-        # Publish to publisher
-        
-        cv2.imshow("Image window", cv_image)
+        l_wheel = 0
+        r_wheel = 0
+        hit = False
+    
+        if self.laser.range_max > 0.2:
+                twist_msg = Twist()
+                twist_msg.linear.x = 0.0
+                twist_msg.linear.y = 0.0
+                twist_msg.linear.z = 0.0
+                twist_msg.angular.x = 0.0
+                twist_msg.angular.y = 0.0
+                twist_msg.angular.z = 0.0
+                self.pub.publish(twist_msg)
+                print "too close" 
+                
+        else:
+            leftRange = numpy.zeros((height,width,1), numpy.uint8)
+            rightRange = numpy.zeros((height,width,1), numpy.uint8)
+            cv2.inRange(left, numpy.array([0, 100, 0]), numpy.array([0, 255, 0]), leftRange)
+            cv2.inRange(right, numpy.array([0, 100, 0]), numpy.array([0, 255, 0]), rightRange)      
+
+            if cv2.countNonZero(leftRange) > 0:
+                print "left"
+                if mean > self.threshold:
+                    l_wheel = 1.0 # Love
+                else:
+                    r_wheel = 1.0 # Fear
+                hit = True
+            
+            if cv2.countNonZero(rightRange) > 0:
+                print "right"
+                if mean > self.threshold:
+                    r_wheel = 1.0 # Love
+            else:
+                l_wheel = 1.0 # Fear
+            hit = True
+            
+        if hit:
+            print "hit"
+            (v, a) = forward_kinematics(l_wheel, r_wheel)
+            twist_msg = Twist()
+            twist_msg.linear.x = v
+            twist_msg.angular.z = a
+            self.pub.publish(twist_msg)
+            
+        else:
+            print "nope"
+            twist_msg = Twist()
+            twist_msg.angular.z = 0.5
+            self.pub.publish(twist_msg)
+            
+        cv2.imshow("Left window", left)
+        cv2.imshow("Right window", right)
+
             
 def forward_kinematics(w_l, w_r):
     c_l = wheel_radius * w_l
@@ -67,7 +100,7 @@ def forward_kinematics(w_l, w_r):
     a = (c_l - c_r) / robot_radius
     return (v, a)
 
+rospy.init_node('node', anonymous=True)
 behave()
-rospy.init_node('behave', anonymous=True)
 rospy.spin()
 cv2.destroyAllWindows()

@@ -35,6 +35,8 @@ class image_converter:
         print numpy.mean(hsv_img[:, :, 1])
         print numpy.mean(hsv_img[:, :, 2])
 
+        print bgr_thresh
+
         bgr_contours, hierachy = cv2.findContours(bgr_thresh.copy(),
                                                   cv2.RETR_TREE,
                                                   cv2.CHAIN_APPROX_SIMPLE)
