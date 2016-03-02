@@ -14,7 +14,7 @@ class behave:
     def __init__(self):
         cv2.namedWindow("Image window", 1)
         cv2.startWindowThread()
-        self.threshold = 40
+        self.threshold = 30
         self.bridge = CvBridge()
         self.pub = rospy.Publisher('/turtlebot_1/cmd_vel', Twist, queue_size=10)
         self.laser_sub = rospy.Subscriber("/turtlebot_1/scan", LaserScan, self.lasercallback)
