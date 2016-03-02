@@ -1,6 +1,7 @@
 import rospy
 import cv2
 import numpy
+import math
 from sensor_msgs.msg import Image
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
@@ -43,19 +44,20 @@ class behave:
         
         ranges = self.laser.ranges
         middle = int(round((len(ranges)-1)/2))
-        short = min(ranges)
         center = ranges[middle]
-        centers = ranges[middle-5:middle+5]
+        leftRanges = ranges[middle-15:middle]
+        rightRanges = ranges[middle:middle+15]
     
-        if short < 1.0:
-                twist_msg = Twist()
-                twist_msg.linear.x = 0.0
-                twist_msg.linear.y = 0.0
-                twist_msg.linear.z = 0.0
-                twist_msg.angular.x = 0.0
-                twist_msg.angular.y = 0.0
-                twist_msg.angular.z = 0.2
-                self.pub.publish(twist_msg)
+        if min(leftRanges) < 0.9 or min(rightRanges) < 0.9:
+            print "Too Close"
+            twist_msg = Twist()
+            twist_msg.linear.x = 0.0
+            twist_msg.linear.y = 0.0
+            twist_msg.linear.z = 0.0
+            twist_msg.angular.x = 0.0
+            twist_msg.angular.y = 0.0
+            twist_msg.angular.z = 0.2
+            self.pub.publish(twist_msg)
                 
         else:
             leftRange = numpy.zeros((height,width,1), numpy.uint8)
@@ -64,6 +66,7 @@ class behave:
             cv2.inRange(right, numpy.array([0, 1, 0]), numpy.array([0, 255, 0]), rightRange)      
 
             if cv2.countNonZero(leftRange) > 0:
+                print "left"
                 if mean > self.threshold:
                     l_wheel = 0.5 # Love
                 else:
@@ -71,6 +74,7 @@ class behave:
                 hit = True
             
             if cv2.countNonZero(rightRange) > 0:
+                print "right"
                 if mean > self.threshold:
                     r_wheel = 0.5 # Love
                 else:
@@ -80,9 +84,13 @@ class behave:
         if hit:
             twist_msg = Twist()
             if r_wheel == l_wheel:
-                value = 1.0 - (1.0/center)
-                if value <= 0:
-                    value = 0
+                print "center"
+                if math.isnan(center):
+                    value = 0.5
+                else:
+                    value = 1.0 - (1.0/center)
+                    if value <= 0:
+                        value = 0
                 (v, a) = forward_kinematics(value, value)
                 twist_msg.linear.x = v
                 twist_msg.angular.z = a
@@ -95,10 +103,20 @@ class behave:
         else:
             twist_msg = Twist()
             
-            if min(centers) > 2.0:
+            if min(leftRanges) > 2.0 and min(rightRanges) > 2.0:
+                print "explore forward"
                 twist_msg.linear.x = 0.5
                 twist_msg.angular.z = 0.0
+            elif min(leftRanges) > 2.0 and min(rightRanges) < 2.0:
+                print "explore left"
+                twist_msg.linear.x = 0.0
+                twist_msg.angular.z = -0.5
+            elif min(leftRanges) < 2.0 and min(rightRanges) > 2.0:
+                print "explore right"
+                twist_msg.linear.x = 0.0
+                twist_msg.angular.z = 0.5
             else:
+                print "explore recover"
                 twist_msg.linear.x = 0.0
                 twist_msg.angular.z = 0.5
             self.pub.publish(twist_msg)
