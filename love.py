@@ -12,8 +12,7 @@ robot_radius = 1
 class behave:
 
     def __init__(self):
-        cv2.namedWindow("Left window", 1)
-        cv2.namedWindow("Right window", 1)
+        cv2.namedWindow("Image window", 1)
         cv2.startWindowThread()
         self.threshold = 40
         self.bridge = CvBridge()
@@ -43,12 +42,12 @@ class behave:
         hit = False
         
         ranges = self.laser.ranges
-        sortDist = sorted(ranges)
         middle = int(round((len(ranges)-1)/2))
-        short = sortDist[0]
+        short = min(ranges)
         center = ranges[middle]
+        centers = ranges[middle-5:middle+5]
     
-        if short < 1.0: # This needs to be fixed
+        if short < 1.0:
                 twist_msg = Twist()
                 twist_msg.linear.x = 0.0
                 twist_msg.linear.y = 0.0
@@ -57,7 +56,6 @@ class behave:
                 twist_msg.angular.y = 0.0
                 twist_msg.angular.z = 0.2
                 self.pub.publish(twist_msg)
-                print "too close" 
                 
         else:
             leftRange = numpy.zeros((height,width,1), numpy.uint8)
@@ -66,26 +64,22 @@ class behave:
             cv2.inRange(right, numpy.array([0, 1, 0]), numpy.array([0, 255, 0]), rightRange)      
 
             if cv2.countNonZero(leftRange) > 0:
-                print "left"
                 if mean > self.threshold:
-                    l_wheel = 0.7 # Love
+                    l_wheel = 0.5 # Love
                 else:
-                    r_wheel = 0.7 # Fear
+                    r_wheel = 0.5 # Fear
                 hit = True
             
             if cv2.countNonZero(rightRange) > 0:
-                print "right"
                 if mean > self.threshold:
-                    r_wheel = 0.7 # Love
+                    r_wheel = 0.5 # Love
                 else:
-                    l_wheel = 0.7 # Fear
+                    l_wheel = 0.5 # Fear
                 hit = True
             
         if hit:
-            print "hit"
             twist_msg = Twist()
             if r_wheel == l_wheel:
-                print center
                 value = 1.0 - (1.0/center)
                 if value <= 0:
                     value = 0
@@ -99,13 +93,17 @@ class behave:
             self.pub.publish(twist_msg)
             
         else:
-            print "nope"
             twist_msg = Twist()
-            twist_msg.angular.z = 0.5
+            
+            if min(centers) > 2.0:
+                twist_msg.linear.x = 0.5
+                twist_msg.angular.z = 0.0
+            else:
+                twist_msg.linear.x = 0.0
+                twist_msg.angular.z = 0.5
             self.pub.publish(twist_msg)
             
-        cv2.imshow("Left window", left)
-        cv2.imshow("Right window", right)
+        cv2.imshow("Image window", cv_image)
 
             
 def forward_kinematics(w_l, w_r):
