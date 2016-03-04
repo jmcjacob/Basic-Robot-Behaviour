@@ -9,7 +9,7 @@ from geometry_msgs.msg import Twist
 from cv_bridge import CvBridge, CvBridgeError
 
 class behave:
-
+    
     # Constructor for the behave class where vairables are set up for the class such as Publishers and Subscribers.
     def __init__(self):
         # Creates the window for the image to be displayed in.
@@ -18,11 +18,11 @@ class behave:
         self.bridge = CvBridge()
         
         # Sets up the publisher where a Twist message shall be published from the node.
-        self.pub = rospy.Publisher('/turtlebot_1/cmd_vel', Twist, queue_size=10)
+        self.pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
         
         # Sets up the subscribers to retreive data from the robots laserscanner and rgb camera.
-        self.laser_sub = rospy.Subscriber("/turtlebot_1/scan", LaserScan, self.lasercallback)
-        self.image_sub = rospy.Subscriber("/turtlebot_1/camera/rgb/image_raw", Image, self.callback)
+        self.laser_sub = rospy.Subscriber("/scan", LaserScan, self.lasercallback)
+        self.image_sub = rospy.Subscriber("/camera/rgb/image_raw", Image, self.callback)
                      
     # Callback for the laser that sets the laser data to a vairable.                     
     def lasercallback(self, data):
@@ -51,10 +51,10 @@ class behave:
         ranges = self.laser.ranges
         middle = int(round((len(ranges)-1)/2))
         center = ranges[middle]
-        leftRanges = ranges[middle-15:middle]
-        rightRanges = ranges[middle:middle+15]
+        leftRanges = ranges[middle-100:middle]
+        rightRanges = ranges[middle:middle+100]
           
-        if min(ranges) < 0.8:
+        if numpy.nanmin(ranges) < 0.8:
             print "Too Close"
             twist_msg.angular.z = 0.2
                 
@@ -67,17 +67,17 @@ class behave:
             if cv2.countNonZero(leftRange) > 0:
                 print "left"
                 if mean > 30:
-                    l_wheel = 0.5 # Love
+                    l_wheel = 1.0 # Love
                 else:
-                    r_wheel = 0.5 # Fear
+                    r_wheel = 1.0 # Fear
                 hit = True
             
             if cv2.countNonZero(rightRange) > 0:
                 print "right"
                 if mean > 30:
-                    r_wheel = 0.5 # Love
+                    r_wheel = 1.0 # Love
                 else:
-                    l_wheel = 0.5 # Fear
+                    l_wheel = 1.0 # Fear
                 hit = True
             
             # Makes the robot approtch the target.
@@ -86,7 +86,7 @@ class behave:
                 if r_wheel == l_wheel:
                     print "center"
                     if math.isnan(center):                        # Checks if center range is not NaN.
-                        value = 0.5
+                        value = 1.0
                     else:
                         value = 1.0 - (1.0/center)                # Calculates wheel values for robot to approtch target.
                         if value <= 0:
@@ -103,25 +103,25 @@ class behave:
             # Makes the robot explore/
             else:
                 # Makes the robot explore forwards when nothing is obstructing it.
-                if min(leftRanges) > 2.0 and min(rightRanges) > 2.0:
+                if numpy.nanmin(leftRanges) > 2.0 and numpy.nanmin(rightRanges) > 2.0:
                     print "explore forward"
-                    twist_msg.linear.x = 0.5
+                    twist_msg.linear.x = 1.0
                     twist_msg.angular.z = 0.0
                 # Turns the robot left when something is on the right of the robot.
-                elif min(leftRanges) > 2.0 and min(rightRanges) < 2.0:
+                elif numpy.nanmin(leftRanges) > 2.0 and numpy.nanmin(rightRanges) < 2.0:
                     print "explore left"
                     twist_msg.linear.x = 0.0
-                    twist_msg.angular.z = -0.5
+                    twist_msg.angular.z = -1.0
                 # Turns the robot right when something is on the left.
-                elif min(leftRanges) < 2.0 and min(rightRanges) > 2.0:
+                elif numpy.nanmin(leftRanges) < 2.0 and numpy.nanmin(rightRanges) > 2.0:
                     print "explore right"
                     twist_msg.linear.x = 0.0
-                    twist_msg.angular.z = 0.5
+                    twist_msg.angular.z = 1.0
                 # If the robot is unsure about ranges will spin until sure.
                 else:
                     print "explore recover"
                     twist_msg.linear.x = 0.0
-                    twist_msg.angular.z = 0.5
+                    twist_msg.angular.z = 1.0
             
         self.pub.publish(twist_msg)           # Publishes the the Twist Message to cmd_vel.
         cv2.imshow("Image window", cv_image)  # Displays cv_image to the image window.
