@@ -1,5 +1,5 @@
-# Robotics
-Basic Robot Behaviour for Robotics Module.   
+# Basic Robot Behaviour
+Basic Robot Behaviour for Robotics Module at The University of Lincoln.   
 Written in Python for ROS to be run on a Turtlebot.
 
 The Turtlebot will explore until it sees the colour green.
