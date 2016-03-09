@@ -22,24 +22,26 @@ class behave:
         
         # Sets up the subscribers to retreive data from the robots laserscanner and rgb camera.
         self.laser_sub = rospy.Subscriber("/scan", LaserScan, self.lasercallback)
-        self.image_sub = rospy.Subscriber("/camera/rgb/image_raw", Image, self.callback)
+        self.image_sub = rospy.Subscriber("/camera/rgb/image_color", Image, self.callback)
                      
     # Callback for the laser that sets the laser data to a vairable.                     
     def lasercallback(self, data):
-        self.laser = data                                    
-                        
+        self.laser = data           
+                    
     # Callback for camera that will move the robot based on its vision.
     def callback(self, data):
         try:
             # Reads in the image and sets the height, width and finds the brightness of the image.
             cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
             height, width, channels = cv_image.shape
-            hsv_img = cv2.cvtColor(cv_image, cv2.COLOR_BGR2HSV)
-            mean = numpy.mean(hsv_img[:, :, 2])
+            cv_image = cv2.medianBlur(cv_image, 5)
+            hsv_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2HSV)
+            mean = numpy.mean(hsv_image[:, :, 2])
+            #print mean
 
             # Splits the image into left and right.
-            left = cv_image[0:height,0:width/2]
-            right = cv_image[0:height,width/2:width]
+            left = hsv_image[0:height,0:width/2]
+            right = hsv_image[0:height,width/2:width]
             height, width, channels = left.shape
             
         except CvBridgeError, e:
@@ -68,12 +70,11 @@ class behave:
             # The left and right images are segmented based on colour.
             leftRange = numpy.zeros((height,width,1), numpy.uint8)
             rightRange = numpy.zeros((height,width,1), numpy.uint8)
-            cv2.inRange(left, numpy.array([0, 1, 0]), numpy.array([0, 255, 0]), leftRange)
-            cv2.inRange(right, numpy.array([0, 1, 0]), numpy.array([0, 255, 0]), rightRange)      
+            cv2.inRange(left, numpy.array([70, 50, 50]), numpy.array([100, 200, 200]), leftRange)
+            cv2.inRange(right, numpy.array([70, 50, 50]), numpy.array([100, 200, 200]), rightRange)    
 
             # Set the wheel speed based on if green is seen in the left image.
-            if cv2.countNonZero(leftRange) > 0:
-                print "left"
+            if cv2.countNonZero(leftRange) > 1000:
                 # Based on the brightness of the image the robot will change the wheel that is moved changing the emotion.
                 if mean > 30:
                     l_wheel = 1.0 # Love
@@ -82,8 +83,7 @@ class behave:
                 hit = True
 
             # Similar to the if statment but with the right image.
-            if cv2.countNonZero(rightRange) > 0:
-                print "right"
+            if cv2.countNonZero(rightRange) > 1000:
                 if mean > 30:
                     r_wheel = 1.0 # Love
                 else:
