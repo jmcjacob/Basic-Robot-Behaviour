@@ -9,8 +9,8 @@ from geometry_msgs.msg import Twist
 from cv_bridge import CvBridge, CvBridgeError
 
 class behave:
-
     # Constructor for the behave class where vairables are set up for the class such as Publishers and Subscribers.
+    @classmethod
     def __init__(self):
         # Creates the window for the image to be displayed in.
         cv2.namedWindow("Image window", 1)
@@ -25,10 +25,12 @@ class behave:
         self.image_sub = rospy.Subscriber("/turtlebot_1/camera/rgb/image_raw", Image, self.callback)
                      
     # Callback for the laser that sets the laser data to a vairable.                     
+    @classmethod
     def lasercallback(self, data):
         self.laser = data                                    
                         
-    # Callback for 
+    # Callback for laser object
+    @classmethod
     def callback(self, data):
         try:
             cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
@@ -41,6 +43,7 @@ class behave:
             height, width, channels = left.shape
             
         except CvBridgeError, e:
+            #Output error message 
             print e
             
         l_wheel = 0
@@ -100,7 +103,7 @@ class behave:
                 twist_msg.linear.x = v
                 twist_msg.angular.z = a
             
-            # Makes the robot explore/
+            # Makes the robot explore
             else:
                 # Makes the robot explore forwards when nothing is obstructing it.
                 if min(leftRanges) > 2.0 and min(rightRanges) > 2.0:
@@ -126,15 +129,18 @@ class behave:
         self.pub.publish(twist_msg)           # Publishes the the Twist Message to cmd_vel.
         cv2.imshow("Image window", cv_image)  # Displays cv_image to the image window.
 
-# Fucnction for converting wheel speeds into a linear and angular velocity. (Hanhide, 2016)
+#Fucnction for converting wheel speeds into a linear and angular velocity. (Hanhide, 2016)
+@classmethod
 def forward_kinematics(w_l, w_r):
     c_l = 1 * w_l
     c_r = 1 * w_r
     v = (c_l + c_r) / 2
     a = (c_l - c_r) / 1
     return (v, a)
-
-rospy.init_node('node', anonymous=True)       # Initiates the Ros node that will publish topics from.
-behave()                                  # Runs the class to control the robot.
-rospy.spin()                              # Make the application run until exited.
-cv2.destroyAllWindows()                   # Closes all windows opened by OpenCV
+    
+#Program entry point
+if __name__ == "__main__":
+    rospy.init_node('node', anonymous=True)   # Initiates the Ros node that will publish topics from.
+    behave()                                  # Runs the class to control the robot.
+    rospy.spin()                              # Make the application run until exited.
+    cv2.destroyAllWindows()                   # Closes all windows opened by OpenCV
